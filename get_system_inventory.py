@@ -29,7 +29,7 @@ def _make_request(uri):
 def get_general_information(idrac_ip):
     """Get general system information"""
 
-    irrelevant_devices = ["Xeon", "C610/X99", "C600/X79"]
+    irrelevant_devices = ["Xeon", "C610/X99", "C600/X79", "Matrox", "PCI Bridge"]
 
     data = _make_request(REDFISH_URI.format(idrac_ip))
 
@@ -130,26 +130,29 @@ def get_all(idrac_ip):
                                     str(general["total_cores"]),
                                     str(general["total_threads"]),
                                     str(general["ram"]),
+                                    disks,
                                     general["all_pcie_devices"],
                                     *nics,
                                     *general["other_nics"]])
     except requests.exceptions.ConnectionError as err:
         return "Could not reach host %s" % idrac_ip
     except RedfishError as err:
-        return err
+        return str(err)
 
     return all_information
 
 
 
 if __name__ == '__main__':
-    # all_dell = ["10.0.5.3", "10.0.5.1", "10.0.23.104", "10.0.15.3"]
 
-    # with Pool(4) as p:
-    #     results = p.map(get_all, all_dell)
+    all_nodes = []
+    for rack in [3,5,15,17,19]:
+        for unit in range(1,42):
+            all_nodes.append("10.0.{}.{}".format(rack, unit))
 
-    # with open("inventory.csv", "a") as out:
-    #     for line in results:
-    #         out.write(line + "\n")
-    print(get_all("10.0.19.32"))
-    
+    with Pool(64) as p:
+        results = p.map(get_all, all_nodes)
+
+    with open("inventory.csv", "a") as out:
+        for line in results:
+            out.write(line + "\n")
