@@ -1,9 +1,8 @@
 """Get system information using the redfish API"""
 
 import os
-import requests
-from pprint import pprint
 from multiprocessing import Pool
+import requests
 
 
 REDFISH_URI = "https://{}/redfish/v1/Systems/System.Embedded.1"
@@ -11,6 +10,7 @@ idrac_username = os.environ.get("IDRAC_USERNAME", "root")
 idrac_password = os.environ.get("IDRAC_PASSWORD", "calvin")
 
 class RedfishError(Exception):
+    """Error if it's related to the redfish api"""
     pass
 
 def _make_request(uri):
@@ -20,12 +20,14 @@ def _make_request(uri):
 
     if response.status_code == 401:
         raise RedfishError("Incorrect username/password. Given URI: %s" % uri)
-    elif response.status_code == 404:
+
+    if response.status_code == 404:
         raise RedfishError("URI not found. Given URI: %s" % uri)
-    elif response.status_code not in [200, 202]:
+
+    if response.status_code not in [200, 202]:
         raise RedfishError("Host may not support Redfish API. Given URI: %s" % uri)
-    else:
-        return response.json()
+
+    return response.json()
 
 
 def get_general_information(idrac_ip):
@@ -94,15 +96,12 @@ def get_nic_information(idrac_ip):
     """Get nic information"""
     data = _make_request(REDFISH_URI.format(idrac_ip) + "/NetworkInterfaces")
 
-    if data is {}:
-        sys.exit(1)
-
-    network_URI_list = [item['@odata.id'] for item in data["Members"]]
+    network_uri_list = [item['@odata.id'] for item in data["Members"]]
 
     all_nics = []
 
-    for item in network_URI_list:
-        item = item.replace("Interfaces","Adapters")
+    for item in network_uri_list:
+        item = item.replace("Interfaces", "Adapters")
         data = _make_request("https://" + idrac_ip + item)
 
         # apparently some nics don't have a model field
@@ -113,7 +112,8 @@ def get_nic_information(idrac_ip):
     return all_nics
 
 def get_all(idrac_ip):
-    """Get complete system information"""
+    """Get complete system information in a format MOC wanted"""
+
     print("Getting all info for %s" % idrac_ip)
 
     try:
@@ -145,11 +145,12 @@ def get_all(idrac_ip):
 if __name__ == '__main__':
 
     all_nodes = []
-    for rack in [3,5,15,17,19]:
-        for unit in range(1,42):
+    for rack in [3, 5, 15, 17, 19]:
+        for unit in range(1, 42):
             all_nodes.append("10.0.{}.{}".format(rack, unit))
-    # all_nodes = ["10.0.23." + str(i) for i in range(101,116)] + ["10.1.10." + str(i) for i in range(1,16)]
 
+    # I should try to use async instead of brute forcing with
+    # multiple processes.
     with Pool(min(len(all_nodes), 64)) as p:
         results = p.map(get_all, all_nodes)
 
