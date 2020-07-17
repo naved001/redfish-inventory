@@ -20,8 +20,10 @@ def _make_request(uri):
 
     if response.status_code == 401:
         raise RedfishError("Incorrect username/password. Given URI: %s" % uri)
+    elif response.status_code == 404:
+        raise RedfishError("URI not found. Given URI: %s" % uri)
     elif response.status_code not in [200, 202]:
-        raise RedfishError("iDrac version may not support Redfish API on host. Given URI: %s" % uri)
+        raise RedfishError("Host may not support Redfish API. Given URI: %s" % uri)
     else:
         return response.json()
 
@@ -29,12 +31,9 @@ def _make_request(uri):
 def get_general_information(idrac_ip):
     """Get general system information"""
 
-    irrelevant_devices = ["Xeon", "C610/X99", "C600/X79", "Matrox", "PCI Bridge"]
+    irrelevant_devices = ["Xeon", "C610/X99", "C600/X79", "G200eR2", "PCI Bridge"]
 
     data = _make_request(REDFISH_URI.format(idrac_ip))
-
-    if data is {}:
-        sys.exit(1)
 
     system_model = data["Model"]
     ram = data["MemorySummary"]["TotalSystemMemoryGiB"]
@@ -149,8 +148,9 @@ if __name__ == '__main__':
     for rack in [3,5,15,17,19]:
         for unit in range(1,42):
             all_nodes.append("10.0.{}.{}".format(rack, unit))
+    # all_nodes = ["10.0.23." + str(i) for i in range(101,116)] + ["10.1.10." + str(i) for i in range(1,16)]
 
-    with Pool(64) as p:
+    with Pool(min(len(all_nodes), 64)) as p:
         results = p.map(get_all, all_nodes)
 
     with open("inventory.csv", "a") as out:
