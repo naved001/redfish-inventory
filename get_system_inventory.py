@@ -74,7 +74,7 @@ def get_disk_information(idrac_ip):
     """Get disk information"""
     data = _make_request(REDFISH_URI.format(idrac_ip) + "/Storage")
 
-    drive_sizes = []
+    all_drives = []
 
     controller_list = []
     for item in data["Members"]:
@@ -87,10 +87,12 @@ def get_disk_information(idrac_ip):
             print("No drives on controller %s" % controller.split("/")[-1])
         else:
             for drive in data["Drives"]:
-                drive_data = _make_request("https://" + idrac_ip + drive["@odata.id"])
-                drive_sizes.append(drive_data["CapacityBytes"]/(2**30))
 
-    return drive_sizes
+                drive_data = _make_request("https://" + idrac_ip + drive["@odata.id"])
+                drive_name = str(round(drive_data["CapacityBytes"]/(2**30))) + " "  + drive_data["MediaType"]
+                all_drives.append(drive_name)
+
+    return all_drives
 
 def get_nic_information(idrac_ip):
     """Get nic information"""
@@ -118,7 +120,7 @@ def get_all(idrac_ip):
 
     try:
         disks = get_disk_information(idrac_ip)
-        disks = "+".join([str(disk) for disk in disks])
+        disks = " + ".join([disk for disk in disks])
 
         nics = get_nic_information(idrac_ip)
 
@@ -144,10 +146,16 @@ def get_all(idrac_ip):
 
 if __name__ == '__main__':
 
-    all_nodes = []
+    kaizen_nodes = []
     for rack in [3, 5, 15, 17, 19]:
         for unit in range(1, 42):
-            all_nodes.append("10.0.{}.{}".format(rack, unit))
+            kaizen_nodes.append("10.0.{}.{}".format(rack, unit))
+
+    kumo_nodes = ["10.0.23." + str(i) for i in range(101,117)] + ["10.1.10." + str(i) for i in range(1,17)]
+    kumo_nodes.append("10.0.23.11") # kumo storage node
+
+    all_nodes = kaizen_nodes + kumo_nodes
+    print(len(all_nodes))
 
     # I should try to use async instead of brute forcing with
     # multiple processes.
